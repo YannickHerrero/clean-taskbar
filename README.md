@@ -49,6 +49,8 @@ The executable will be at `target/release/taskbar-hider.exe` (or `target/x86_64-
 3. Press and hold the Windows key to show the taskbar
 4. Right-click the system tray icon and select "Quit" to exit
 
+**Tip:** Use `Shift + Windows` to show the taskbar without opening the Start menu when you release the keys.
+
 ## How It Works
 
 - Uses `SetWindowsHookEx` with `WH_KEYBOARD_LL` to detect Windows key press/release
