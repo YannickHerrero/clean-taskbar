@@ -1,12 +1,11 @@
 //! Taskbar Hider - Main Entry Point
 //!
 //! A minimal Windows utility that hides the taskbar and shows it only when
-//! the Windows key is held or the Start menu is active.
+//! the Windows key is held.
 
 #![windows_subsystem = "windows"]
 
 mod hooks;
-mod shell;
 mod taskbar;
 mod tray;
 
@@ -29,11 +28,9 @@ const TIMER_ID_HIDE_TASKBAR: usize = 1;
 // Global state
 static TASKBAR_SHOULD_BE_VISIBLE: AtomicBool = AtomicBool::new(false);
 static WIN_KEY_HELD: AtomicBool = AtomicBool::new(false);
-static SYSTEM_WINDOW_ACTIVE: AtomicBool = AtomicBool::new(false);
 
 static mut TASKBAR_HWND: HWND = null_mut();
 static mut MAIN_HWND: HWND = null_mut();
-static mut SHELL_HOOK_MSG: u32 = 0;
 static mut TASKBAR_CREATED_MSG: u32 = 0;
 static mut WIN_KEY_RELEASE_TIME: u64 = 0;
 
@@ -97,10 +94,6 @@ fn run() -> Result<(), &'static str> {
             return Err("Failed to create main window");
         }
 
-        // Create shell hook window
-        let (_shell_hwnd, shell_msg) = shell::create_shell_hook_window(instance)?;
-        SHELL_HOOK_MSG = shell_msg;
-
         // Register for TaskbarCreated message (Explorer restart detection)
         let taskbar_created = wide_string("TaskbarCreated");
         TASKBAR_CREATED_MSG = RegisterWindowMessageW(taskbar_created.as_ptr());
@@ -137,9 +130,7 @@ fn cleanup() {
 
 fn update_taskbar_visibility() {
     unsafe {
-        let should_show = WIN_KEY_HELD.load(Ordering::SeqCst)
-            || SYSTEM_WINDOW_ACTIVE.load(Ordering::SeqCst)
-            || is_within_delay_period();
+        let should_show = WIN_KEY_HELD.load(Ordering::SeqCst) || is_within_delay_period();
 
         let currently_visible = TASKBAR_SHOULD_BE_VISIBLE.load(Ordering::SeqCst);
 
@@ -216,14 +207,6 @@ unsafe extern "system" fn window_proc(
                 KillTimer(hwnd, TIMER_ID_HIDE_TASKBAR);
                 update_taskbar_visibility();
             }
-            return 0;
-        }
-
-        // Shell hook messages
-        m if SHELL_HOOK_MSG != 0 && m == SHELL_HOOK_MSG => {
-            let is_system = shell::handle_shell_message(wparam, lparam);
-            SYSTEM_WINDOW_ACTIVE.store(is_system, Ordering::SeqCst);
-            update_taskbar_visibility();
             return 0;
         }
 
